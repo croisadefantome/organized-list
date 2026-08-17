@@ -26,7 +26,12 @@
 <body>
 <main><div class="shell">
   <header class="masthead"><div><p class="eyebrow">A personal index</p><h1>The Organized List</h1></div><div class="head-meta"><span id="count"></span><select id="sort" aria-label="Sort entries"><option value="category">Sort: Category</option><option value="title">Sort: Title</option><option value="year">Sort: Newest</option></select></div></header>
-  <section class="intro" aria-label="About this list"><p><span>Purpose</span>A flexible home for things worth keeping track of.</p><p><span>Currently</span>Collecting slowly, choosing carefully.</p></section>
+  <section class="intro" aria-label="About this list">
+  <p id="introduction"></p>
+  <p><span>Contact</span><span id="contact"></span></p>
+  <p><span>Seeking</span><span id="seeking"></span></p>
+  <p><span>Updated</span><span id="updated"></span></p>
+</section>
   <nav class="tabs" id="tabs" aria-label="List views"><button class="active" data-tab="All">All</button></nav>
   <div class="toolbar"><label for="search">Search the list</label><input id="search" type="search" placeholder="Try a title, category, status, or tag…"></div>
   <div class="columns" aria-hidden="true"><span>Entry</span><span>Year</span><span>Status</span></div>
@@ -58,6 +63,27 @@
     tabs.innerHTML=['All',...lists].map((name,i)=>`<button class="${i===0?'active':''}" data-tab="${safe(name)}">${safe(name)}</button>`).join('');
     tabs.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>{activeTab=button.dataset.tab;tabs.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b===button));render()}));
   }
+  async function loadSiteInfo(){
+  try{
+    const response=await fetch(SITE_INFO_URL,{cache:'no-store'});
+    if(!response.ok) throw new Error('Site Info request failed');
+
+    const rows=parseCSV(await response.text());
+    const info=Object.fromEntries(
+      rows.slice(1).map(row=>[
+        String(row[0]??'').trim().toLowerCase(),
+        String(row[1]??'').trim()
+      ])
+    );
+
+    document.querySelector('#introduction').textContent=info.introduction||'';
+    document.querySelector('#contact').textContent=info.contact||'';
+    document.querySelector('#seeking').textContent=info.seeking||'';
+    document.querySelector('#updated').textContent=info.updated||'';
+  }catch(error){
+    console.error('Could not load Site Info:',error);
+  }
+}
   async function loadSheet(){
     catalog.innerHTML='<div class="empty"><strong>Loading your list…</strong></div>';
     try{
@@ -68,7 +94,7 @@
       buildTabs();render();
     }catch(error){count.textContent='';catalog.innerHTML='<div class="empty"><strong>Could not load the Google Sheet.</strong><p>Confirm that the Items tab is still published as CSV, then refresh.</p></div>'}
   }
-  search.addEventListener('input',render);sort.addEventListener('change',render);loadSheet();
+  search.addEventListener('input',render);sort.addEventListener('change',render);loadSiteInfo();loadSheet();
 </script>
 </body>
 </html>
