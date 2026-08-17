@@ -29,7 +29,7 @@ summary > span:nth-child(n+2){
 </head>
 <body>
 <main><div class="shell">
-  <header class="masthead"><div><h1>Croisadefantome's List</h1></div><div class="head-meta"><span id="count"></span><select id="sort" aria-label="Sort entries"><option value="category">Sort: Category</option><option value="title">Sort: Title</option><option value="year">Sort: Newest</option></select></div></header>
+  <header class="masthead"><div><h1>Croisadefantome's List</h1></div><div class="head-meta"><span id="count"></span><select id="sort" aria-label="Sort entries"><option value="sheet">Sort: Sheet Order</option><option value="sheet">Sort: Sheet Order</option><option value="sheet">Sort: Sheet Order</option><option value="sheet">Sort: Sheet Order</option><option value="category">Sort: Category</option><option value="title">Sort: Title</option><option value="year">Sort: Newest</option></select></div></header>
   <section class="intro" aria-label="About this list">
   <p id="introduction"></p>
   <p><span>Contact</span><span id="contact"></span></p>
@@ -51,7 +51,7 @@ summary > span:nth-child(n+2){
   const safe=s=>String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   function render(){
     const q=search.value.trim().toLowerCase();
-    const shown=entries.filter(e=>(activeTab==='All'||e.type===activeTab)&&(!q||[e.title,e.category,e.production,e.master,e.format,...e.tags].join(' ').toLowerCase().includes(q))).sort((a,b)=>sort.value==='title'?a.title.localeCompare(b.title):sort.value==='year'?b.year.localeCompare(a.year):a.category.localeCompare(b.category)||a.title.localeCompare(b.title));
+    const shown=entries.filter(e=>(activeTab==='All'||e.type===activeTab)&&(!q||[e.title,e.category,e.production,e.master,e.format,...e.tags].join(' ').toLowerCase().includes(q))).sort((a,b)=>sort.value==='sheet'?a.order-b.order:sort.value==='title'?a.title.localeCompare(b.title):sort.value==='year'?b.year.localeCompare(a.year):a.category.localeCompare(b.category)||a.title.localeCompare(b.title));
     count.textContent=String(shown.length).padStart(2,'0')+' entries';
     if(!shown.length){catalog.innerHTML='<div class="empty"><strong>Nothing found.</strong><p>Try a different search or switch lists.</p></div>';return}
     const groups=Object.groupBy?Object.groupBy(shown,e=>e.category):shown.reduce((a,e)=>((a[e.category]??=[]).push(e),a),{});
@@ -94,7 +94,7 @@ summary > span:nth-child(n+2){
       const response=await fetch(SHEET_URL,{cache:'no-store'});if(!response.ok)throw new Error('Sheet request failed');
       const rows=parseCSV(await response.text()),headers=rows.shift().map(h=>h.trim().toLowerCase());
       const value=(row,name)=>String(row[headers.indexOf(name)]??'').trim();
-      entries=rows.filter(row=>value(row,'title')).map(row=>({title:value(row,'title'),category:value(row,'category')||'Uncategorized',type:value(row,'list')||'Other',production:value(row,'production'),master:value(row,'master'),format:value(row,'format'),description:value(row,'description'),tags:value(row,'tags').split(',').map(t=>t.trim()).filter(Boolean)}));
+      entries=rows.filter(row=>value(row,'title')).map((row,index)=>({order:index,title:value(row,'title'),category:value(row,'category')||'Uncategorized',type:value(row,'list')||'Other',production:value(row,'production'),master:value(row,'master'),format:value(row,'format'),description:value(row,'description'),tags:value(row,'tags').split(',').map(t=>t.trim()).filter(Boolean)}));
       buildTabs();render();
     }catch(error){count.textContent='';catalog.innerHTML='<div class="empty"><strong>Could not load the Google Sheet.</strong><p>Confirm that the Items tab is still published as CSV, then refresh.</p></div>'}
   }
