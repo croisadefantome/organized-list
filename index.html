@@ -27,26 +27,17 @@
 <main><div class="shell">
   <header class="masthead"><div><p class="eyebrow">A personal index</p><h1>The Organized List</h1></div><div class="head-meta"><span id="count"></span><select id="sort" aria-label="Sort entries"><option value="category">Sort: Category</option><option value="title">Sort: Title</option><option value="year">Sort: Newest</option></select></div></header>
   <section class="intro" aria-label="About this list"><p><span>Purpose</span>A flexible home for things worth keeping track of.</p><p><span>Currently</span>Collecting slowly, choosing carefully.</p></section>
-  <nav class="tabs" aria-label="List views"><button class="active" data-tab="All">All</button><button data-tab="Collection">Collection</button><button data-tab="Wishlist">Wishlist</button></nav>
+  <nav class="tabs" id="tabs" aria-label="List views"><button class="active" data-tab="All">All</button></nav>
   <div class="toolbar"><label for="search">Search the list</label><input id="search" type="search" placeholder="Try a title, category, status, or tag…"></div>
   <div class="columns" aria-hidden="true"><span>Entry</span><span>Year</span><span>Status</span></div>
   <section id="catalog" aria-live="polite"></section>
   <footer><span>The Organized List</span><span>Last updated August 2026</span></footer>
 </div></main>
 <script>
-  // EDIT THIS LIST to replace the sample entries with your own.
-  const entries=[
-    {title:'The Midnight Archive',category:'Books & Print',type:'Collection',year:'2024',status:'Owned',description:'A beautifully bound reference edition with gilt details and a cloth cover.',tags:['hardcover','favorite']},
-    {title:'Field Notes, Volume II',category:'Books & Print',type:'Wishlist',year:'2022',status:'Searching',description:'Looking for the moss-green first printing, preferably in very good condition.',tags:['first edition','priority']},
-    {title:'Amber Study',category:'Objects',type:'Collection',year:'1978',status:'Owned',description:'Small hand-thrown ceramic vessel in a warm amber glaze.',tags:['ceramic','vintage']},
-    {title:'Brass Desk Calendar',category:'Objects',type:'Wishlist',year:'1960s',status:'Considering',description:'Perpetual calendar with rotating month and date wheels.',tags:['brass','desk']},
-    {title:'Night Train',category:'Music & Media',type:'Collection',year:'2019',status:'Owned',description:'Limited translucent pressing with the original lyric booklet.',tags:['vinyl','limited']},
-    {title:'Sunday Matinee',category:'Music & Media',type:'Wishlist',year:'2006',status:'Searching',description:'A quiet favorite that has been surprisingly difficult to track down.',tags:['film','priority']},
-    {title:'Museum Ticket No. 14',category:'Paper Ephemera',type:'Collection',year:'1998',status:'Archived',description:'Numbered admission ticket from a traveling modern art exhibition.',tags:['ticket','memory']},
-    {title:'Coastal Postcard Set',category:'Paper Ephemera',type:'Wishlist',year:'1950s',status:'Considering',description:'A complete set of six illustrated postcards in muted seaside colors.',tags:['postcard','vintage']}
-  ];
+  const SHEET_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vSssvMrPUSSYaeDruD6--FeBIO5dFwvGVDTMNv965wh0Mo-miWxGFG_1tFQvS5TuVNclSHWljD0ymqO/pub?gid=0&single=true&output=csv';
+  let entries=[];
   let activeTab='All';
-  const catalog=document.querySelector('#catalog'),search=document.querySelector('#search'),sort=document.querySelector('#sort'),count=document.querySelector('#count');
+  const catalog=document.querySelector('#catalog'),search=document.querySelector('#search'),sort=document.querySelector('#sort'),count=document.querySelector('#count'),tabs=document.querySelector('#tabs');
   const safe=s=>String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   function render(){
     const q=search.value.trim().toLowerCase();
@@ -56,8 +47,27 @@
     const groups=Object.groupBy?Object.groupBy(shown,e=>e.category):shown.reduce((a,e)=>((a[e.category]??=[]).push(e),a),{});
     catalog.innerHTML=Object.entries(groups).map(([category,items])=>`<div class="group"><div class="group-head"><h2>${safe(category)}</h2><span>${items.length} ${items.length===1?'item':'items'}</span></div>${items.map(e=>`<details class="entry"><summary><span class="title">${safe(e.title)}<small>${safe(e.type)}</small></span><span>${safe(e.year)}</span><span class="status">${safe(e.status)}</span></summary><div class="body"><p>${safe(e.description)}</p><div class="tags">${e.tags.map(t=>`<span>${safe(t)}</span>`).join('')}</div></div></details>`).join('')}</div>`).join('');
   }
-  document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>{activeTab=button.dataset.tab;document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b===button));render()}));
-  search.addEventListener('input',render);sort.addEventListener('change',render);render();
+  function parseCSV(text){
+    const rows=[];let row=[],cell='',quoted=false;
+    for(let i=0;i<text.length;i++){const c=text[i],next=text[i+1];if(c==='"'&&quoted&&next==='"'){cell+='"';i++}else if(c==='"'){quoted=!quoted}else if(c===','&&!quoted){row.push(cell);cell=''}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&next==='\n')i++;row.push(cell);if(row.some(v=>v.trim()))rows.push(row);row=[];cell=''}else cell+=c}
+    row.push(cell);if(row.some(v=>v.trim()))rows.push(row);return rows;
+  }
+  function buildTabs(){
+    const lists=[...new Set(entries.map(e=>e.type).filter(Boolean))];
+    tabs.innerHTML=['All',...lists].map((name,i)=>`<button class="${i===0?'active':''}" data-tab="${safe(name)}">${safe(name)}</button>`).join('');
+    tabs.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>{activeTab=button.dataset.tab;tabs.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b===button));render()}));
+  }
+  async function loadSheet(){
+    catalog.innerHTML='<div class="empty"><strong>Loading your list…</strong></div>';
+    try{
+      const response=await fetch(SHEET_URL,{cache:'no-store'});if(!response.ok)throw new Error('Sheet request failed');
+      const rows=parseCSV(await response.text()),headers=rows.shift().map(h=>h.trim().toLowerCase());
+      const value=(row,name)=>String(row[headers.indexOf(name)]??'').trim();
+      entries=rows.filter(row=>value(row,'title')).map(row=>({title:value(row,'title'),category:value(row,'category')||'Uncategorized',type:value(row,'list')||'Other',year:value(row,'year'),status:value(row,'status'),description:value(row,'description'),tags:value(row,'tags').split(',').map(t=>t.trim()).filter(Boolean)}));
+      buildTabs();render();
+    }catch(error){count.textContent='';catalog.innerHTML='<div class="empty"><strong>Could not load the Google Sheet.</strong><p>Confirm that the Items tab is still published as CSV, then refresh.</p></div>'}
+  }
+  search.addEventListener('input',render);sort.addEventListener('change',render);loadSheet();
 </script>
 </body>
 </html>
